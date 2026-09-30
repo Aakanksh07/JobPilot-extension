@@ -1,4 +1,4 @@
-// HuntAI extension — background service worker.
+// JobPilot extension — background service worker.
 //
 // All backend calls go through here, not the content script. A content
 // script's fetch() runs in the context of whatever page it's injected
@@ -7,18 +7,18 @@
 // extension context with host_permissions for your API domain, so it can
 // call your backend cleanly regardless of what site the user is on.
 //
-// The extension never shows its own login form. The HuntAI website itself
+// The extension never shows its own login form. The JobPilot website itself
 // hands off the logged-in session via chrome.runtime.sendMessage() (see
 // onMessageExternal below + the small snippet added to login.html/
 // index.html/tracker.html) — same pattern LastPass/Grammarly use for their
-// companion extensions. If the user is signed into huntai.com, the
+// companion extensions. If the user is signed into JobPilot.com, the
 // extension is signed in too, automatically.
 
 const API_BASE = "https://huntai-backend.onrender.com/api/v1"; // set this to your deployed backend
 
 async function getToken() {
-  const { huntai_token } = await chrome.storage.local.get("huntai_token");
-  return huntai_token || null;
+  const { JobPilot_token } = await chrome.storage.local.get("JobPilot_token");
+  return JobPilot_token || null;
 }
 
 async function apiFetch(path, options = {}) {
@@ -31,9 +31,9 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-// ── Session handoff from the HuntAI website ─────────────────────────────
+// ── Session handoff from the JobPilot website ─────────────────────────────
 // Only pages matching "externally_connectable" in manifest.json (your
-// huntai.com domain) can send these — no other website can call this.
+// JobPilot.com domain) can send these — no other website can call this.
 chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
   (async () => {
     try {
@@ -45,18 +45,18 @@ chrome.runtime.onMessageExternal.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: true, installed: true });
           break;
         }
-        case "HUNTAI_SYNC": {
+        case "JobPilot_SYNC": {
           // Sent after login, on page load if already logged in, and
           // whenever the user switches their active resume.
           await chrome.storage.local.set({
-            huntai_token:     msg.token || null,
-            huntai_email:     msg.email || null,
-            huntai_resume_id: msg.resumeId || null,
+            JobPilot_token:     msg.token || null,
+            JobPilot_email:     msg.email || null,
+            JobPilot_resume_id: msg.resumeId || null,
           });
           sendResponse({ ok: true });
           break;
         }
-        case "HUNTAI_LOGOUT": {
+        case "JobPilot_LOGOUT": {
           await chrome.storage.local.clear();
           sendResponse({ ok: true });
           break;
@@ -77,8 +77,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       switch (msg.type) {
         case "GET_AUTH_STATE": {
           const token = await getToken();
-          const { huntai_resume_id, huntai_email } = await chrome.storage.local.get(["huntai_resume_id", "huntai_email"]);
-          sendResponse({ ok: true, loggedIn: !!token, resumeId: huntai_resume_id || null, email: huntai_email || null });
+          const { JobPilot_resume_id, JobPilot_email } = await chrome.storage.local.get(["JobPilot_resume_id", "JobPilot_email"]);
+          sendResponse({ ok: true, loggedIn: !!token, resumeId: JobPilot_resume_id || null, email: JobPilot_email || null });
           break;
         }
 
