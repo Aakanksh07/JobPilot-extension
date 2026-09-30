@@ -1,4 +1,4 @@
-// HuntAI extension — content script.
+// JobPilot extension — content script.
 // Injected into every page. Extraction/fill logic here mirrors what
 // _extract_page_fields_json / _apply_field_mapping did in Python+Playwright
 // — it's the same idea, just running natively in the browser instead of
@@ -7,8 +7,8 @@
 // ships to the client.
 
 (async () => {
-  if (window.__huntaiInstalled) return;
-  window.__huntaiInstalled = true;
+  if (window.__JobPilotInstalled) return;
+  window.__JobPilotInstalled = true;
 
   const auth = await send({ type: "GET_AUTH_STATE" });
   if (!auth.ok || !auth.loggedIn || !auth.resumeId) return; // not logged in / no resume selected — stay dormant
@@ -119,7 +119,7 @@
 
   function pageContextForJob() {
     // Best-effort — the user could be on ANY job posting, not just ones
-    // HuntAI's own scraper surfaced, so there's no stored job record to
+    // JobPilot's own scraper surfaced, so there's no stored job record to
     // pull from. Grab whatever signal the page itself offers.
     const title = document.title || "";
     const ogSite = document.querySelector('meta[property="og:site_name"]')?.content || "";
@@ -185,7 +185,7 @@
         : "Resume.pdf";
       await attachFile(resumeInput, blob, filename);
       state.resumeUploaded = true;
-    } catch (e) { console.warn("[HuntAI] resume attach failed", e); }
+    } catch (e) { console.warn("[JobPilot] resume attach failed", e); }
   }
 
   async function uploadCoverLetterIfNeeded() {
@@ -204,11 +204,20 @@
       state.coverLetterText = res.text || null;
       state.coverLetterPdfBase64 = res.pdfBase64;
       state.coverLetterFilename = res.filename || "Cover_Letter.pdf";
-    } catch (e) { console.warn("[HuntAI] cover letter attach failed", e); }
+    } catch (e) { console.warn("[JobPilot] cover letter attach failed", e); }
   }
 
-  // ── overlay UI (same visual language as the Playwright version) ────────
-  const COLORS = { bg: "#111318", border: "rgba(255,255,255,0.13)", accent: "#6EE7B7", text: "#F3F4F6", text2: "#9CA3AF", red: "#F87171" };
+  // ── overlay UI (matches the JobPilot website's light/cream theme) ──────
+  const COLORS = { bg: "#FFFFFF", bg3: "#F6F2E9", border: "#D8D2C2", accent: "#B17457", text: "#4A4947", text2: "#736E66", red: "#B34C43" };
+  const FONT_BODY = "'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+  const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
+  if (!document.getElementById("__jobpilot_ext_fonts")) {
+    const link = document.createElement("link");
+    link.id = "__jobpilot_ext_fonts";
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap";
+    document.head.appendChild(link);
+  }
   function el(tag, style, html) {
     const e = document.createElement(tag);
     if (style) Object.assign(e.style, style);
@@ -217,19 +226,19 @@
   }
 
   const root = el("div", { position: "fixed", bottom: "20px", right: "20px", zIndex: 2147483647, width: "52px", height: "52px" });
-  const panel = el("div", { position: "absolute", bottom: "62px", right: "0", display: "none", width: "300px", fontFamily: "system-ui, sans-serif", fontSize: "14px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: "14px", padding: "16px", boxShadow: "0 12px 40px rgba(0,0,0,0.5)", color: COLORS.text });
-  const header = el("div", { fontWeight: "800", fontSize: "15px", marginBottom: "12px", color: COLORS.accent, cursor: "move", userSelect: "none" }, 'Hunt<span style="color:#fff">AI</span> <span style="opacity:0.4;font-weight:400;font-size:11px">(drag to move)</span>');
-  const fillBtn = el("button", { width: "100%", background: COLORS.accent, color: "#0b0c10", border: "none", borderRadius: "999px", padding: "10px", fontWeight: "700", fontSize: "13px", cursor: "pointer" }, "✨ Fill this page");
-  const resultBox = el("div", { fontSize: "12px", color: COLORS.text2, marginTop: "8px", marginBottom: "8px", lineHeight: "1.5" });
+  const panel = el("div", { position: "absolute", bottom: "62px", right: "0", display: "none", width: "300px", fontFamily: FONT_BODY, fontSize: "14px", background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: "14px", padding: "16px", boxShadow: "0 12px 40px rgba(74,73,71,0.18)", color: COLORS.text });
+  const header = el("div", { display: "flex", alignItems: "center", gap: "6px", fontFamily: "'Playfair Display', serif", fontWeight: "700", fontSize: "16px", marginBottom: "12px", color: COLORS.text, cursor: "move", userSelect: "none" }, `Job<span style="color:${COLORS.text2}">Pilot</span><span style="width:5px;height:5px;border-radius:50%;background:${COLORS.accent};display:inline-block;margin-left:2px;"></span><span style="opacity:0.55;font-family:${FONT_MONO};font-weight:400;font-size:10px;margin-left:4px;">(drag to move)</span>`);
+  const fillBtn = el("button", { width: "100%", background: COLORS.accent, color: "#FFFFFF", border: "none", borderRadius: "999px", padding: "10px", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "13px", cursor: "pointer" }, "✨ Fill this page");
+  const resultBox = el("div", { fontFamily: FONT_MONO, fontSize: "11.5px", color: COLORS.text2, marginTop: "8px", marginBottom: "8px", lineHeight: "1.55" });
   const divider = el("div", { borderTop: `1px solid ${COLORS.border}`, margin: "10px 0" });
   const doneLabel = el("div", { fontSize: "11px", color: COLORS.text2, marginBottom: "8px" }, "When you're done with this application:");
   const row = el("div", { display: "flex", gap: "8px" });
-  const appliedBtn = el("button", { flex: "1", background: "transparent", color: COLORS.accent, border: `1px solid ${COLORS.accent}`, borderRadius: "999px", padding: "8px", fontWeight: "600", fontSize: "12px", cursor: "pointer" }, "✅ Mark Applied");
-  const skipBtn = el("button", { flex: "1", background: "transparent", color: COLORS.red, border: `1px solid rgba(248,113,113,0.4)`, borderRadius: "999px", padding: "8px", fontWeight: "600", fontSize: "12px", cursor: "pointer" }, "⏭ Not applying");
+  const appliedBtn = el("button", { flex: "1", background: "transparent", color: COLORS.accent, border: `1px solid ${COLORS.accent}`, borderRadius: "999px", padding: "8px", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }, "✅ Mark Applied");
+  const skipBtn = el("button", { flex: "1", background: "transparent", color: COLORS.red, border: `1px solid rgba(179,76,67,0.4)`, borderRadius: "999px", padding: "8px", fontFamily: FONT_BODY, fontWeight: "600", fontSize: "12px", cursor: "pointer" }, "⏭ Not applying");
   row.append(appliedBtn, skipBtn);
   panel.append(header, fillBtn, resultBox, divider, doneLabel, row);
 
-  const fab = el("button", { width: "52px", height: "52px", borderRadius: "50%", border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.accent, fontSize: "20px", cursor: "grab", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" }, "🎯");
+  const fab = el("button", { width: "52px", height: "52px", borderRadius: "50%", border: `1px solid ${COLORS.border}`, background: COLORS.bg, color: COLORS.accent, fontSize: "20px", cursor: "grab", boxShadow: "0 6px 20px rgba(74,73,71,0.16)" }, "🎯");
 
   // ── Dragging ────────────────────────────────────────────────────────────
   // Position is saved per-origin in localStorage, same as the Playwright
@@ -237,7 +246,7 @@
   // on the same site. Works from the fab (click still opens/closes the
   // panel — click vs. drag disambiguated by movement distance) or the
   // panel header.
-  const POS_KEY = "__huntai_ext_overlay_pos";
+  const POS_KEY = "__JobPilot_ext_overlay_pos";
   try {
     const saved = JSON.parse(localStorage.getItem(POS_KEY) || "null");
     if (saved && typeof saved.left === "number" && typeof saved.top === "number") {
@@ -304,7 +313,7 @@
         const safe = state.coverLetterText.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>");
         html += `<details style="margin-top:8px;">
           <summary style="cursor:pointer;color:${COLORS.accent};">📄 View cover letter</summary>
-          <div style="margin-top:6px;max-height:200px;overflow-y:auto;font-size:11px;line-height:1.5;color:${COLORS.text2};background:#181b22;border-radius:8px;padding:10px;">${safe}</div>
+          <div style="margin-top:6px;max-height:200px;overflow-y:auto;font-size:11px;line-height:1.5;color:${COLORS.text2};background:${COLORS.bg3};border-radius:8px;padding:10px;">${safe}</div>
         </details>`;
       }
       resultBox.innerHTML = html;
@@ -378,11 +387,11 @@
   // Respects whatever the user last set (defaults to visible), and applies
   // live if the popup's toggle is used while this page is already open —
   // no refresh needed.
-  chrome.storage.local.get("huntai_overlay_visible", ({ huntai_overlay_visible }) => {
-    if (huntai_overlay_visible === false) root.style.display = "none";
+  chrome.storage.local.get("JobPilot_overlay_visible", ({ JobPilot_overlay_visible }) => {
+    if (JobPilot_overlay_visible === false) root.style.display = "none";
   });
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "HUNTAI_TOGGLE_VISIBILITY") {
+    if (msg.type === "JobPilot_TOGGLE_VISIBILITY") {
       root.style.display = msg.visible ? "flex" : "none";
     }
   });
